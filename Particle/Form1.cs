@@ -18,9 +18,9 @@ namespace Particle {
         Random rnd = new Random();
         List<Star> stars = new List<Star>();
 
-        private void AddStar(Point pt)
+        private void AddStar(Point pt, float birthSize, float maxDxRatio)
         {
-            Star star = new Star(pt, rnd);
+            Star star = new Star(pt, rnd, birthSize, maxDxRatio);
             stars.Add(star);
         }
 
@@ -29,53 +29,69 @@ namespace Particle {
             g.FillEllipse(brush, x - size / 2, y - size / 2, size, size);
         }
 
-        private void UpdateFrame(DateTime now)
+        private void UpdateFrame(DateTime now, float decreaseRatio, float downSpeed)
         {
-            this.stars = stars.Where(star => 10 * Math.Pow(0.1, (now - star.birthTime).TotalSeconds) >= 1f).ToList();
+            foreach (var star in this.stars)
+            {
+                float dt = (float)(now - star.birthTime).TotalSeconds;
+                
+                star.drawSize = star.birthSize * (float)Math.Pow(decreaseRatio, dt);
+                
+                float dy = dt * downSpeed;
+                float dx = dy * star.dxRatio;
+                star.drawPos.X = star.birthPos.X + dx;
+                star.drawPos.Y = star.birthPos.Y + dy;
+            }
+            this.stars = stars.Where(star => star.drawSize >= 2f).ToList();
         }
 
-        private void RenderFrame(Graphics g, DateTime now)
+        private void RenderFrame(Graphics g)
         {
             g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
             foreach (var star in this.stars)
             {
-                float dt = (float)(now - star.birthTime).TotalSeconds;
-                float x = star.pos.X + dt * 200 * star.dxRatio;
-                float y = star.pos.Y + dt * 200;
-                float size = 10 * (float)Math.Pow(0.1, dt);
-                this.DrawStar(g, star.brush, x, y, size);
+                this.DrawStar(g, star.brush, star.drawPos.X, star.drawPos.Y, star.drawSize);
             }
         }
 
         private void pbxDraw_MouseMove(object sender, MouseEventArgs e)
         {
-            this.AddStar(e.Location);
+            float birthSize = (float)numBirthSize.Value;
+            float maxDxRatio = (float)numMaxDxRatio.Value;
+            this.AddStar(e.Location, birthSize, maxDxRatio);
         }
 
         private void pbxDraw_Paint(object sender, PaintEventArgs e)
         {
-            DateTime now = DateTime.Now;
-            this.RenderFrame(e.Graphics, now);
+            this.RenderFrame(e.Graphics);
         }
 
         private void tmr17_Tick(object sender, EventArgs e)
         {
             DateTime now = DateTime.Now;
-            this.UpdateFrame(now);
+            float decreaseRatio = (float)numDecreaseRatio.Value;
+            float downSpeed = (float)numDownSpeed.Value;
+            this.UpdateFrame(now, decreaseRatio, downSpeed);
             this.pbxDraw.Refresh();
         }
     }
 
     public class Star {
-        public PointF pos;
         public DateTime birthTime;
+        public PointF birthPos;
+        public PointF drawPos;
+        public float birthSize;
+        public float drawSize;
         public float dxRatio;
         public Brush brush;
-        public Star(PointF pos, Random rnd)
+        public Star(PointF pos, Random rnd, float birthSize, float maxDxRatio)
         {
-            this.pos = pos;
             this.birthTime = DateTime.Now;
-            this.dxRatio = (float)(rnd.NextDouble() * 1 - 0.5);
+            this.birthPos = pos;
+            this.drawPos = pos;
+            this.birthSize = birthSize;
+            this.drawSize = birthSize;
+            this.dxRatio = (float)(rnd.NextDouble() * maxDxRatio * 2 - maxDxRatio);
             this.brush = new SolidBrush(Color.FromArgb(rnd.Next(256), rnd.Next(256), rnd.Next(256)));
         }
         ~Star()
